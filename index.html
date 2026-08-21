@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>礼金往来记账</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+  <!-- ============ 登录视图 ============ -->
+  <div id="login-view" class="login-wrap">
+    <div class="login-card">
+      <h1>礼金往来记账</h1>
+      <p class="sub" id="login-sub">记录人情往来，分人分时段查询，多账号各自独立。</p>
+
+      <!-- 云端模式 -->
+      <div id="cloud-login" class="hidden">
+        <div class="seg">
+          <button class="seg-btn active" data-auth="signin">登录</button>
+          <button class="seg-btn" data-auth="signup">注册</button>
+        </div>
+        <input id="auth-email" type="email" placeholder="邮箱" autocomplete="username" />
+        <input id="auth-pwd" type="password" placeholder="密码（至少6位）" autocomplete="current-password" />
+        <button id="auth-submit" class="btn primary block">登录</button>
+        <p class="hint" id="auth-hint"></p>
+      </div>
+
+      <!-- 本地模式 -->
+      <div id="local-login">
+        <input id="local-account" type="text" placeholder="输入账号名进入（如：张三）" />
+        <button id="local-submit" class="btn primary block">进入</button>
+        <p class="hint">未配置云端时，数据仅保存在本浏览器。可在「设置」中填入 Supabase 信息升级为云端同步。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 主应用 ============ -->
+  <div id="app-view" class="hidden">
+    <header class="topbar">
+      <div class="brand">礼金往来记账</div>
+      <div class="user">
+        <span id="user-name"></span>
+        <span id="mode-badge" class="badge"></span>
+        <button id="btn-logout" class="btn ghost">退出</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="add">记账</button>
+      <button class="tab" data-tab="list">明细</button>
+      <button class="tab" data-tab="stats">统计</button>
+      <button class="tab" data-tab="settings">设置</button>
+    </nav>
+
+    <main class="content">
+
+      <!-- 记账 -->
+      <section id="tab-add" class="pane active">
+        <h2 id="form-title">添加一笔记录</h2>
+        <form id="add-form" class="form">
+          <input type="hidden" id="edit-id" />
+          <div class="field">
+            <label>类型</label>
+            <div class="seg">
+              <button type="button" class="seg-btn active" data-type="in">收礼（别人给我）</button>
+              <button type="button" class="seg-btn" data-type="out">送礼（我给别人）</button>
+            </div>
+            <input type="hidden" id="rec-type" value="in" />
+          </div>
+          <div class="field">
+            <label>往来人</label>
+            <input id="rec-person" list="person-list" placeholder="如：李雷" required />
+            <datalist id="person-list"></datalist>
+          </div>
+          <div class="field">
+            <label>事件类型</label>
+            <select id="rec-event">
+              <option>结婚</option><option>满月/百日</option><option>周岁</option>
+              <option>乔迁</option><option>生日</option><option>升学/谢师</option>
+              <option>白事/奠仪</option><option>开业</option><option>其他</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>金额（元）</label>
+            <input id="rec-amount" type="number" min="0" step="0.01" placeholder="0.00" required />
+          </div>
+          <div class="field">
+            <label>日期</label>
+            <input id="rec-date" type="date" required />
+          </div>
+          <div class="field">
+            <label>备注 / 回礼情况</label>
+            <input id="rec-note" type="text" placeholder="可选，如：已回礼200" />
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn primary">保存</button>
+            <button type="button" id="btn-cancel-edit" class="btn ghost hidden">取消编辑</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 明细 -->
+      <section id="tab-list" class="pane">
+        <div class="filters">
+          <input id="f-person" type="text" placeholder="往来人" />
+          <input id="f-from" type="date" title="起始日期" />
+          <input id="f-to" type="date" title="结束日期" />
+          <select id="f-type">
+            <option value="">全部类型</option>
+            <option value="in">收礼</option>
+            <option value="out">送礼</option>
+          </select>
+          <select id="f-event">
+            <option value="">全部事件</option>
+            <option>结婚</option><option>满月/百日</option><option>周岁</option>
+            <option>乔迁</option><option>生日</option><option>升学/谢师</option>
+            <option>白事/奠仪</option><option>开业</option><option>其他</option>
+          </select>
+          <button id="btn-query" class="btn">查询</button>
+          <button id="btn-reset" class="btn ghost">重置</button>
+        </div>
+        <div id="list-summary" class="summary"></div>
+        <div class="table-wrap">
+          <table id="list-table">
+            <thead>
+              <tr><th>日期</th><th>类型</th><th>往来人</th><th>事件</th><th class="num">金额</th><th>备注</th><th>操作</th></tr>
+            </thead>
+            <tbody id="list-body"></tbody>
+          </table>
+          <p id="list-empty" class="empty hidden">暂无记录，去「记账」添加一笔吧。</p>
+        </div>
+      </section>
+
+      <!-- 统计 -->
+      <section id="tab-stats" class="pane">
+        <div class="cards">
+          <div class="card"><div class="card-label">总收礼</div><div class="card-val in" id="st-in">¥0.00</div></div>
+          <div class="card"><div class="card-label">总送礼</div><div class="card-val out" id="st-out">¥0.00</div></div>
+          <div class="card"><div class="card-label">净人情</div><div class="card-val" id="st-net">¥0.00</div></div>
+          <div class="card"><div class="card-label">记录数</div><div class="card-val" id="st-count">0</div></div>
+        </div>
+        <div class="chart-box">
+          <h3>按月趋势</h3>
+          <canvas id="chart-month" height="120"></canvas>
+        </div>
+        <div class="chart-box">
+          <h3>按人排行（净额）</h3>
+          <canvas id="chart-person" height="160"></canvas>
+        </div>
+        <h3>人情账本（按人汇总）</h3>
+        <div class="table-wrap">
+          <table id="stats-person-table">
+            <thead>
+              <tr><th>往来人</th><th class="num">收礼</th><th class="num">送礼</th><th class="num">净额</th><th>状态</th><th>最近</th></tr>
+            </thead>
+            <tbody id="stats-person-body"></tbody>
+          </table>
+          <p id="stats-empty" class="empty hidden">还没有数据，先去记几笔。</p>
+        </div>
+      </section>
+
+      <!-- 设置 -->
+      <section id="tab-settings" class="pane">
+        <h3>云端同步（Supabase）</h3>
+        <p class="hint">填入 Supabase 项目的 URL 与 anon key 后，数据将自动改为云端保存，并支持多设备、多账号访问。留空则使用本浏览器本地存储。</p>
+        <div class="form narrow">
+          <div class="field"><label>Supabase URL</label><input id="cfg-url" type="text" placeholder="https://xxxx.supabase.co" /></div>
+          <div class="field"><label>Anon Key</label><input id="cfg-key" type="text" placeholder="eyJ..." /></div>
+          <div class="actions">
+            <button id="btn-save-cfg" class="btn primary">保存并连接</button>
+            <button id="btn-clear-cfg" class="btn ghost">清除云端配置</button>
+          </div>
+          <p id="cfg-msg" class="hint"></p>
+        </div>
+
+        <h3>数据备份（网盘）</h3>
+        <p class="hint">导出为 JSON 文件，可保存到百度网盘等做长期备份；换设备时用「导入」恢复。</p>
+        <div class="actions">
+          <button id="btn-export" class="btn">导出 JSON</button>
+          <label class="btn file-btn">导入 JSON<input id="file-import" type="file" accept="application/json" hidden /></label>
+          <button id="btn-sample" class="btn ghost">载入示例数据</button>
+          <button id="btn-clear" class="btn danger">清空当前账号数据</button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="assets/config.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/auth.js"></script>
+  <script src="assets/stats.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
